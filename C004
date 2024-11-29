@@ -1,0 +1,49 @@
+#include <asf.h>
+
+volatile bool task_flag = false; // Flag para indicar que a tarefa deve ser executada
+
+// Handler da interrupção do temporizador
+void TC3_Handler(void)
+{
+    // Verifica se a interrupção foi causada por um overflow
+    if (tc_get_status(TC3) & TC_STATUS_OVERFLOW) {
+        tc_clear_status(TC3, TC_STATUS_OVERFLOW);
+        task_flag = true; // Sinaliza que a tarefa deve ser executada
+    }
+}
+
+void configure_timer(void)
+{
+    // Ativar o clock para o temporizador TC3
+    struct tc_config config_tc;
+    tc_get_config_defaults(&config_tc);
+
+    // Configura para operar no modo de 16 bits e com frequência
+    config_tc.counter_size = TC_COUNTER_SIZE_16BIT;
+    config_tc.clock_source = GCLK_GENERATOR_1; // Configure o gerador de clock correto
+    config_tc.clock_prescaler = TC_CLOCK_PRESCALER_DIV64;
+    config_tc.wave_generation = TC_WAVE_GENERATION_MATCH_FREQ;
+    config_tc.counter_16_bit.compare_capture_channel[0] = 15625; // Para obter 100ms (ajustar com base no clock)
+
+    tc_init(&tc_instance, TC3, &config_tc);
+
+    // Ativa a interrupção de overflow
+    tc_enable(&tc_instance);
+    tc_register_callback(&tc_instance, TC3_Handler, TC_CALLBACK_OVERFLOW);
+}
+
+int main(void)
+{
+    system_init(); // Inicializa o sistema
+    configure_timer(); // Configura o timer
+
+    while (1) {
+        if (task_flag) {
+            task_flag = false; // Reseta a flag
+
+            // Coloque aqui o código da tarefa que deve ser executada a cada 100ms
+            // Exemplo: toggle LED
+            port_pin_toggle_output_level(LED_0_PIN);
+        }
+    }
+}
